@@ -11,15 +11,27 @@ import (
 	"net/http"
 )
 
+
+
 func Server(app *application.App) {
+	wrapper := func(handler func (writer http.ResponseWriter, request *http.Request, app *application.App)) func (writer http.ResponseWriter, request *http.Request){
+		return func(writer http.ResponseWriter, request *http.Request) {
+			handler(writer, request, app)
+		}
+	}
+
 	r := mux.NewRouter()
 
-	r.HandleFunc("requests", listRequests).Methods(http.MethodGet)
-	r.HandleFunc("requests", deleteRequests).Methods(http.MethodDelete)
-	r.HandleFunc("requests/{id}", getRequest).Methods(http.MethodGet)
-	r.HandleFunc("requests/{id}", deleteRequest).Methods(http.MethodDelete)
-	r.HandleFunc("requests/{id}/repeat", repeatRequest).Methods(http.MethodPost)
-	r.HandleFunc("requests/{id}/commandInjectionScan", scanCommandInjection).Methods(http.MethodPost)
+	r.HandleFunc("/requests", wrapper(listRequests)).Methods(http.MethodGet)
+	//r.HandleFunc("requests", wrapper(deleteRequests)).Methods(http.MethodDelete)
+
+	r.HandleFunc("/requests/{id}", func(writer http.ResponseWriter, request *http.Request) {
+		getRequest(writer, request, app)
+	}).Methods(http.MethodGet)
+
+	//r.HandleFunc("requests/{id}", wrapper(deleteRequest)).Methods(http.MethodDelete)
+	r.HandleFunc("/requests/{id}/repeat", wrapper(repeatRequest)).Methods(http.MethodPost)
+	r.HandleFunc("/requests/{id}/commandInjectionScan", wrapper(scanCommandInjection)).Methods(http.MethodPost)
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%s", viper.Get(config.RepeaterIP), viper.Get(config.RepeaterPort)),

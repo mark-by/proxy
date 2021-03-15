@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"crypto/tls"
 	"errors"
+	"github.com/mark-by/proxy/domain/entity"
 	"github.com/mark-by/proxy/domain/repository"
 	"github.com/sirupsen/logrus"
-	"io"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -16,11 +16,30 @@ type Requests struct {
 	repositories *repository.Repositories
 }
 
+func (requests Requests) Get(id int) *entity.Request {
+	req, err := requests.repositories.Requests.Get(id)
+	if err != nil {
+		logrus.Error("Get: ", err)
+		return nil
+	}
+	return req
+}
+
+func (requests Requests) GetAll() []entity.Request {
+	reqs, err := requests.repositories.Requests.List()
+	if err != nil {
+		logrus.Error("Get all : ", err)
+		return nil
+	}
+	return reqs
+}
+
 func newRequests(repositories *repository.Repositories) *Requests {
 	return &Requests{repositories}
 }
 
 func (requests Requests) Intercept(w http.ResponseWriter, r *http.Request) {
+	logrus.Info("URI: ", r.RequestURI)
 	if r.Method == http.MethodConnect {
 		requests.tunnel(w, r)
 		return
@@ -30,13 +49,14 @@ func (requests Requests) Intercept(w http.ResponseWriter, r *http.Request) {
 }
 
 func (requests Requests) proxy(w http.ResponseWriter, r *http.Request) {
+	go requests.saveRequest(r)
 	resp, err := http.DefaultTransport.RoundTrip(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
 
-	copyResponse(resp, w)
+	CopyResponse(resp, w)
 
 	if err = resp.Body.Close(); err != nil {
 		logrus.Error("fail to close body:", err)
@@ -49,21 +69,11 @@ func (requests Requests) saveRequest(r *http.Request) {
 		logrus.Error("fail to dump request:", err)
 	}
 
-	_, err = requests.repositories.Requests.Save(string(dump))
+	logrus.Info("URI IN SAVE: ", r.RequestURI)
+
+	_, err = requests.repositories.Requests.Save(r.RequestURI, string(dump))
 	if err != nil {
 		logrus.Error("fail to save request:", err)
-	}
-}
-
-func copyResponse(src *http.Response, dst http.ResponseWriter) {
-	for name, values := range src.Header {
-		dst.Header()[name] = values
-	}
-
-	dst.WriteHeader(src.StatusCode)
-
-	if _, err := io.Copy(dst, src.Body); err != nil {
-		logrus.Error("fail to write body:", err)
 	}
 }
 
@@ -156,7 +166,6 @@ func (requests Requests) serveRequestByTCP(client *tls.Conn, server *tls.Conn, r
 		logrus.Error("fail to dump response: ", err)
 		return err
 	}
-	logrus.Info("HTTPS RESPONSE: \n", string(rawResponse))
 
 	_, err = client.Write(rawResponse)
 	if err != nil {
@@ -184,6 +193,7 @@ func (requests Requests) tunnel(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
+	go requests.saveRequest(request)
 
 	tcpServerConn, err := tls.Dial("tcp", r.URL.Host, tlsConfig)
 	if err != nil {
@@ -196,49 +206,6 @@ func (requests Requests) tunnel(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-}
-
-func wrap(upstream http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		dump, _ := httputil.DumpRequest(r, true)
-		logrus.Info("IN WRAPPER: ", string(dump))
-
-		upstream.ServeHTTP(w, r)
-	})
-}
-
-type onCloseConn struct {
-	net.Conn
-	f func()
-}
-
-func (c *onCloseConn) Close() error {
-	if c.f != nil {
-		c.f()
-		c.f = nil
-	}
-	return c.Conn.Close()
-}
-
-type oneShotListener struct {
-	c net.Conn
-}
-
-func (l *oneShotListener) Accept() (net.Conn, error) {
-	if l.c == nil {
-		return nil, errors.New("closed on accept")
-	}
-	c := l.c
-	l.c = nil
-	return c, nil
-}
-
-func (l *oneShotListener) Close() error {
-	return nil
-}
-
-func (l *oneShotListener) Addr() net.Addr {
-	return l.c.LocalAddr()
 }
 
 var _ IRequests = &Requests{}

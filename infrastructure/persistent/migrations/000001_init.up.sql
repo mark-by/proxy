@@ -1,8 +1,5 @@
-create table if not exists contacts (
+create table if not exists requests (
     id serial primary key,
-    url text not null,
-    method text not null,
-    protocol text not null,
-    headers text not null,
-    body text default null
+    raw text not null,
+    url text not null
 );
