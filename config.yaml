@@ -1,0 +1,12 @@
+db:
+  host: 127.0.0.1
+  name: "proxy"
+  password: "123"
+  port: "5432"
+  user: "proxy"
+repeater:
+  ip: 127.0.0.1
+  port: "8888"
+server:
+  ip: 127.0.0.1
+  port: "8080"
