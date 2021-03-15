@@ -21,7 +21,7 @@ func (r Request) List() ([]entity.Request, error) {
 	}
 	defer func() {endTx(tx, err)}()
 
-	rows, err := tx.Query("select id, raw, url from requests")
+	rows, err := tx.Query("select id, raw, url from requests order by id desc")
 	if err != nil {
 		return nil, err
 	}
@@ -55,11 +55,31 @@ func (r Request) Save(url, rawRequest string) (int, error) {
 }
 
 func (r Request) Delete(id int) error {
-	panic("implement me")
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {endTx(tx, err)}()
+
+	_, err = tx.Exec("delete from requests where id = $1", id)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r Request) DeleteAll() error {
-	panic("implement me")
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {endTx(tx, err)}()
+
+	_, err = tx.Exec("delete from requests")
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r Request) Get(id int) (*entity.Request, error) {

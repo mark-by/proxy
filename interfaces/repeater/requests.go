@@ -58,11 +58,26 @@ func getRequest(writer http.ResponseWriter, request *http.Request, app *applicat
 }
 
 func deleteRequest(writer http.ResponseWriter, request *http.Request, app *application.App) {
+	vars := mux.Vars(request)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(writer, err.Error(), http.StatusBadRequest)
+		return
+	}
 
+	err = app.Requests.Delete(id)
+	if err != nil {
+		http.Error(writer, err.Error(), http.StatusBadRequest)
+		return
+	}
 }
 
 func deleteRequests(writer http.ResponseWriter, request *http.Request, app *application.App) {
-
+	err := app.Requests.DeleteAll()
+	if err != nil {
+		http.Error(writer, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func repeatRequest(writer http.ResponseWriter, request *http.Request, app *application.App) {

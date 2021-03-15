@@ -23,15 +23,15 @@ func Server(app *application.App) {
 	r := mux.NewRouter()
 
 	r.HandleFunc("/requests", wrapper(listRequests)).Methods(http.MethodGet)
-	//r.HandleFunc("requests", wrapper(deleteRequests)).Methods(http.MethodDelete)
+	r.HandleFunc("/requests", wrapper(deleteRequests)).Methods(http.MethodDelete)
 
 	r.HandleFunc("/requests/{id}", func(writer http.ResponseWriter, request *http.Request) {
 		getRequest(writer, request, app)
 	}).Methods(http.MethodGet)
 
-	//r.HandleFunc("requests/{id}", wrapper(deleteRequest)).Methods(http.MethodDelete)
+	r.HandleFunc("/requests/{id}", wrapper(deleteRequest)).Methods(http.MethodDelete)
 	r.HandleFunc("/requests/{id}/repeat", wrapper(repeatRequest)).Methods(http.MethodPost)
-	r.HandleFunc("/requests/{id}/commandInjectionScan", wrapper(scanCommandInjection)).Methods(http.MethodPost)
+	r.HandleFunc("/requests/{id}/scan/cmd", wrapper(scan)).Methods(http.MethodPost)
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%s", viper.Get(config.RepeaterIP), viper.Get(config.RepeaterPort)),

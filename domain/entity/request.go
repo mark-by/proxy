@@ -13,7 +13,7 @@ type Request struct {
 	URL string `json:"url"`
 }
 
-func (r Request) Revive() (*http.Request, error) {
+func (r *Request) Revive() (*http.Request, error) {
 	buff := bytes.Buffer{}
 	buff.Write([]byte(r.Raw))
 	request, err := http.ReadRequest(bufio.NewReader(&buff))
@@ -27,11 +27,11 @@ func (r Request) Revive() (*http.Request, error) {
 	}
 
 	newRequest, err := http.NewRequest(request.Method, r.URL, request.Body)
-	copyHeaders(request, newRequest)
+	CopyHeaders(request, newRequest)
 	return newRequest, nil
 }
 
-func copyHeaders(src *http.Request, dst *http.Request) {
+func CopyHeaders(src *http.Request, dst *http.Request) {
 	for header, values := range src.Header {
 		for _, value := range values {
 			dst.Header.Add(header, value)

@@ -16,6 +16,14 @@ type Requests struct {
 	repositories *repository.Repositories
 }
 
+func (requests Requests) Delete(id int) error {
+	return requests.repositories.Requests.Delete(id)
+}
+
+func (requests Requests) DeleteAll() error {
+	return requests.repositories.Requests.DeleteAll()
+}
+
 func (requests Requests) Get(id int) *entity.Request {
 	req, err := requests.repositories.Requests.Get(id)
 	if err != nil {
