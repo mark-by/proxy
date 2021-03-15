@@ -1,17 +1,15 @@
 package application
 
 import (
-	"context"
+	"bufio"
 	"crypto/tls"
 	"errors"
 	"github.com/mark-by/proxy/domain/repository"
 	"github.com/sirupsen/logrus"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"sync"
 )
 
 type Requests struct {
@@ -32,20 +30,17 @@ func (requests Requests) Intercept(w http.ResponseWriter, r *http.Request) {
 }
 
 func (requests Requests) proxy(w http.ResponseWriter, r *http.Request) {
-
 	resp, err := http.DefaultTransport.RoundTrip(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
 
-	defer func() {
-		if err = resp.Body.Close(); err != nil {
-			logrus.Error("fail to close body:", err)
-		}
-	}()
-
 	copyResponse(resp, w)
+
+	if err = resp.Body.Close(); err != nil {
+		logrus.Error("fail to close body:", err)
+	}
 }
 
 func (requests Requests) saveRequest(r *http.Request) {
@@ -72,96 +67,135 @@ func copyResponse(src *http.Response, dst http.ResponseWriter) {
 	}
 }
 
-func (requests Requests) tunnel(w http.ResponseWriter, r *http.Request) {
+func (requests Requests) hijackConnect(w http.ResponseWriter) (net.Conn, error) {
+	hijacker, ok := w.(http.Hijacker)
+	if !ok {
+		http.Error(w, "Hijacking not supported", http.StatusInternalServerError)
+		return nil, errors.New("hijacking not supported")
+	}
+
+	clientRawConn, _, err := hijacker.Hijack()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return nil, err
+	}
+
+	_, err = clientRawConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+	if err != nil {
+		logrus.Error("cRawConn fail to handshake ", err)
+		clientRawConn.Close()
+		return nil, err
+	}
+	return clientRawConn, nil
+}
+
+func (requests Requests) initializeTCPClientConn(conn net.Conn, w http.ResponseWriter, r *http.Request) (*tls.Conn, *tls.Config, error) {
 	name, _, err := net.SplitHostPort(r.Host)
 	if err != nil || name == "" {
 		logrus.Error("cannot determine certificate name for ", r.Host)
 		http.Error(w, "no upstream", http.StatusServiceUnavailable)
-		return
+		return nil, nil, err
 	}
 
 	certificate, err := getCertificateByName(name)
 	if err != nil {
 		logrus.Error("fail to get certificate: ", err)
 		http.Error(w, "nu upstream", http.StatusNotImplemented)
-		return
+		return nil, nil, err
 	}
 
-	var sTlsConn *tls.Conn
 	tlsConfig := &tls.Config{
-		MinVersion:   tls.VersionTLS10,
 		Certificates: []tls.Certificate{*certificate},
-		GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			cLocalTlsConfig := &tls.Config{
-				InsecureSkipVerify: true,
-				ServerName:         hello.ServerName,
-			}
-			sTlsConn, err = tls.Dial("tcp", r.Host, cLocalTlsConfig)
-			if err != nil {
-				log.Println("dial", r.Host, err)
-				return nil, err
-			}
-			return getCertificateByName(hello.ServerName)
-		},
+		ServerName: r.URL.Scheme,
 	}
 
-	hijacker, ok := w.(http.Hijacker)
-	if !ok {
-		http.Error(w, "Hijacking not supported", http.StatusInternalServerError)
-		return
-	}
-
-	cRawConn, _, err := hijacker.Hijack()
+	tcpConn := tls.Server(conn, tlsConfig)
+	err = tcpConn.Handshake()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
-		return
+		tcpConn.Close()
+		conn.Close()
+		logrus.Error("fail to handshake: ", err)
+		return nil, nil, err
 	}
 
-	_, err = cRawConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n" +
-		"Proxy-agent: Golang-Proxy\r\n" +
-		"\r\n"))
+	return tcpConn, tlsConfig, nil
+}
+
+func (requests Requests) readRequestFromTCP(conn *tls.Conn) (*http.Request, error) {
+	clientReader := bufio.NewReader(conn)
+	request, err := http.ReadRequest(clientReader)
 	if err != nil {
-		logrus.Error("cRawConn fail to handshake for ", r.Host,": ", err)
-		cRawConn.Close()
-		return
+		logrus.Error("fail to read request: ", err)
+		return nil, err
 	}
+	return request, nil
+}
 
-	cTlsConn := tls.Server(cRawConn, tlsConfig)
-	err = cTlsConn.Handshake()
+func (requests Requests) serveRequestByTCP(client *tls.Conn, server *tls.Conn, request *http.Request) error {
+	dumpRequest, err := httputil.DumpRequest(request, true)
 	if err != nil {
-		logrus.Error("fail to handshake for ", r.Host,": ", err)
-		cTlsConn.Close()
-		cRawConn.Close()
+		logrus.Error("fail to dump request: ", err)
+		return err
+	}
+	logrus.Info("HTTPS REQUEST: \n", string(dumpRequest))
+	_, err = server.Write(dumpRequest)
+	if err != nil {
+		logrus.Error("fail to write request: ", err)
+		return err
+	}
+
+	serverReader := bufio.NewReader(server)
+	response, err := http.ReadResponse(serverReader, request)
+	if err != nil {
+		logrus.Error("fail to read response: ", err)
+		return err
+	}
+
+	rawResponse, err := httputil.DumpResponse(response, true)
+	if err != nil {
+		logrus.Error("fail to dump response: ", err)
+		return err
+	}
+	logrus.Info("HTTPS RESPONSE: \n", string(rawResponse))
+
+	_, err = client.Write(rawResponse)
+	if err != nil {
+		logrus.Error("fail to write response: ", err)
+		return err
+	}
+
+	return nil
+}
+
+func (requests Requests) tunnel(w http.ResponseWriter, r *http.Request) {
+	clientRawConn, err := requests.hijackConnect(w)
+	if err != nil {
 		return
 	}
-	defer cTlsConn.Close()
+	defer clientRawConn.Close()
 
-	if sTlsConn == nil {
-		logrus.Error("fail to determine cert name for ", r.Host)
+	tcpClientConn, tlsConfig, err := requests.initializeTCPClientConn(clientRawConn, w, r)
+	if err != nil {
 		return
 	}
-	defer sTlsConn.Close()
+	defer tcpClientConn.Close()
 
-	rp := &httputil.ReverseProxy{
-		Director: func(r *http.Request) {
-			r.URL.Host = r.Host
-			r.URL.Scheme = "https"
-		},
-		Transport: &http.Transport{
-			DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				if sTlsConn == nil {
-					return nil, errors.New("closed on dial")
-				}
-				return sTlsConn, nil
-			},
-		},
+	request, err := requests.readRequestFromTCP(tcpClientConn)
+	if err != nil {
+		return
 	}
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	wc := &onCloseConn{cTlsConn, func() { wg.Done() }}
-	http.Serve(&oneShotListener{wc}, wrap(rp))
-	wg.Wait()
+	tcpServerConn, err := tls.Dial("tcp", r.URL.Host, tlsConfig)
+	if err != nil {
+		logrus.Error("fail to create tcp server conn: ", err)
+		return
+	}
+	defer tcpServerConn.Close()
+
+	err = requests.serveRequestByTCP(tcpClientConn, tcpServerConn, request)
+	if err != nil {
+		return
+	}
 }
 
 func wrap(upstream http.Handler) http.Handler {
