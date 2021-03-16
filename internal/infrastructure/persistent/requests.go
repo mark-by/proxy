@@ -2,8 +2,8 @@ package persistent
 
 import (
 	"github.com/jackc/pgx"
-	"github.com/mark-by/proxy/domain/entity"
-	"github.com/mark-by/proxy/domain/repository"
+	"github.com/mark-by/proxy/internal/domain/entity"
+	"github.com/mark-by/proxy/internal/domain/repository"
 )
 
 type Request struct {
@@ -19,7 +19,7 @@ func (r Request) List() ([]entity.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func() {endTx(tx, err)}()
+	defer func() { endTx(tx, err)}()
 
 	rows, err := tx.Query("select id, raw, url from requests order by id desc")
 	if err != nil {
@@ -45,7 +45,7 @@ func (r Request) Save(url, rawRequest string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer func() {endTx(tx, err)}()
+	defer func() { endTx(tx, err)}()
 	var ID int
 	err = tx.QueryRow("insert into requests (raw, url) values ($1, $2) returning id", rawRequest, url).Scan(&ID)
 	if err != nil {
@@ -59,7 +59,7 @@ func (r Request) Delete(id int) error {
 	if err != nil {
 		return err
 	}
-	defer func() {endTx(tx, err)}()
+	defer func() { endTx(tx, err)}()
 
 	_, err = tx.Exec("delete from requests where id = $1", id)
 	if err != nil {
@@ -73,7 +73,7 @@ func (r Request) DeleteAll() error {
 	if err != nil {
 		return err
 	}
-	defer func() {endTx(tx, err)}()
+	defer func() { endTx(tx, err)}()
 
 	_, err = tx.Exec("delete from requests")
 	if err != nil {
@@ -87,7 +87,7 @@ func (r Request) Get(id int) (*entity.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func() {endTx(tx, err)}()
+	defer func() { endTx(tx, err)}()
 
 	var request entity.Request
 	err = tx.QueryRow("select raw, url from requests where id = $1", id).Scan(&request.Raw, &request.URL)

@@ -1,7 +1,7 @@
 package application
 
 import (
-	"github.com/mark-by/proxy/domain/entity"
+	"github.com/mark-by/proxy/internal/domain/entity"
 	"net/http"
 )
 

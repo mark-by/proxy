@@ -1,10 +1,10 @@
 package persistent
 
 import (
-	"eco4.ru/work/telephony/config"
 	"fmt"
 	"github.com/jackc/pgx"
-	"github.com/mark-by/proxy/domain/repository"
+	"github.com/mark-by/proxy/internal/config"
+	"github.com/mark-by/proxy/internal/domain/repository"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -15,7 +15,7 @@ import (
 
 func Migrate() {
 	m, err := migrate.New(
-		"file://infrastructure/persistent/migrations",
+		"file://internal/infrastructure/persistent/migrations",
 		fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
 			viper.GetString(config.DBUser),
 			viper.GetString(config.DBPassword),

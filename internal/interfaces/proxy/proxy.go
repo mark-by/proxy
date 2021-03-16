@@ -3,8 +3,8 @@ package proxy
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/mark-by/proxy/application"
-	"github.com/mark-by/proxy/config"
+	"github.com/mark-by/proxy/internal/application"
+	"github.com/mark-by/proxy/internal/config"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"net/http"

@@ -3,7 +3,7 @@ module github.com/mark-by/proxy
 go 1.16
 
 require (
-	eco4.ru/work/telephony v1.1.3
+	github.com/gofrs/uuid v4.0.0+incompatible // indirect
 	github.com/golang-migrate/migrate/v4 v4.14.1
 	github.com/gorilla/mux v1.7.4
 	github.com/jackc/fake v0.0.0-20150926172116-812a484cc733 // indirect

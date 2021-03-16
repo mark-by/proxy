@@ -1,6 +1,6 @@
 package application
 
-import "github.com/mark-by/proxy/domain/repository"
+import "github.com/mark-by/proxy/internal/domain/repository"
 
 type App struct {
 	Requests *Requests

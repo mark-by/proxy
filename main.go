@@ -1,10 +1,10 @@
 package main
 
 import (
-	"github.com/mark-by/proxy/application"
-	"github.com/mark-by/proxy/infrastructure/persistent"
-	"github.com/mark-by/proxy/interfaces/proxy"
-	"github.com/mark-by/proxy/interfaces/repeater"
+	"github.com/mark-by/proxy/internal/application"
+	"github.com/mark-by/proxy/internal/infrastructure/persistent"
+	"github.com/mark-by/proxy/internal/interfaces/proxy"
+	"github.com/mark-by/proxy/internal/interfaces/repeater"
 )
 
 func init() {

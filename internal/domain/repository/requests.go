@@ -1,6 +1,6 @@
 package repository
 
-import "github.com/mark-by/proxy/domain/entity"
+import "github.com/mark-by/proxy/internal/domain/entity"
 
 type Requests interface {
 	List() ([]entity.Request, error)

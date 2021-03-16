@@ -5,8 +5,8 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"github.com/gorilla/mux"
-	"github.com/mark-by/proxy/application"
-	"github.com/mark-by/proxy/domain/entity"
+	"github.com/mark-by/proxy/internal/application"
+	"github.com/mark-by/proxy/internal/domain/entity"
 	"github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
@@ -66,7 +66,7 @@ func scanCmd(request *entity.Request) []string {
 			ParamsPlace:  "query",
 			ValuesGetter: getQueryValues,
 			Injections:   injections,
-			Accum: &queryResults,
+			Accum:        &queryResults,
 		})
 	}
 	err = liveRequest.ParseForm()
@@ -78,7 +78,7 @@ func scanCmd(request *entity.Request) []string {
 			ParamsPlace:  "form",
 			ValuesGetter: getPostValues,
 			Injections:   injections,
-			Accum: &formResults,
+			Accum:        &formResults,
 		})
 	}
 

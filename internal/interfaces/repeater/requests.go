@@ -3,7 +3,7 @@ package repeater
 import (
 	"encoding/json"
 	"github.com/gorilla/mux"
-	"github.com/mark-by/proxy/application"
+	"github.com/mark-by/proxy/internal/application"
 	"net/http"
 	"strconv"
 )
