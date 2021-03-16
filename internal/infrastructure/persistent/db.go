@@ -7,13 +7,14 @@ import (
 	"github.com/mark-by/proxy/internal/domain/repository"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-func Migrate() {
+func _migrate() error {
 	m, err := migrate.New(
 		"file://internal/infrastructure/persistent/migrations",
 		fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
@@ -25,7 +26,8 @@ func Migrate() {
 		),
 	)
 	if err != nil {
-		logrus.Fatal("Fail to connect to database: ", err)
+		logrus.Error("Fail to connect to database: ", err)
+		return err
 	}
 	defer m.Close()
 
@@ -38,7 +40,22 @@ func Migrate() {
 	default:
 		logrus.Fatal("Fail to apply migrations: ", err)
 	}
+	return nil
 }
+
+func Migrate() {
+	for idx := 0; idx < 3; idx++ {
+		err := _migrate()
+		if err != nil {
+			time.Sleep(5 * time.Second)
+		} else {
+			return
+		}
+	}
+
+	logrus.Fatal("Fail to migrate")
+}
+
 
 func NewRepositories() *repository.Repositories {
 	conn, err := pgx.NewConnPool(pgx.ConnPoolConfig{

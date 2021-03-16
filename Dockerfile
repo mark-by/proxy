@@ -38,10 +38,9 @@ RUN chmod 0700 /var/lib/postgresql/data &&\
     createdb -O proxy proxy &&\
     pg_ctl stop
 
-COPY --from=build /app/bin/proxy .
+COPY --from=build /app/bin/proxy /app/bin/proxy
 ADD . .
 
-ENTRYPOINT ["/app/bin/proxy"]
 
 EXPOSE 8080
 EXPOSE 8888

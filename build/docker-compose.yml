@@ -1,0 +1,18 @@
+version: "3.8"
+services:
+  postgres:
+    build:
+      context: ..
+      dockerfile: "build/postgres.dockerfile"
+    environment:
+      - POSTGRES_PASSWORD=123
+  go:
+    build:
+      context: ..
+      dockerfile: "build/api.dockerfile"
+    ports:
+      - "8080:8080"
+      - "8888:8888"
+    depends_on:
+      - postgres
+
