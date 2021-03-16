@@ -47,7 +47,6 @@ func newRequests(repositories *repository.Repositories) *Requests {
 }
 
 func (requests Requests) Intercept(w http.ResponseWriter, r *http.Request) {
-	logrus.Info("URI: ", r.RequestURI)
 	if r.Method == http.MethodConnect {
 		requests.tunnel(w, r)
 		return
@@ -76,8 +75,6 @@ func (requests Requests) saveRequest(r *http.Request) {
 	if err != nil {
 		logrus.Error("fail to dump request:", err)
 	}
-
-	logrus.Info("URI IN SAVE: ", r.RequestURI)
 
 	_, err = requests.repositories.Requests.Save(r.RequestURI, string(dump))
 	if err != nil {
